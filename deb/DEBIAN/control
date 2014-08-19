@@ -1,0 +1,7 @@
+Package: prov
+Priority: optional
+Section: tools
+Maintainer: Jonas Samuelsson <jonaspetter@gmail.com>
+Architecture: all
+Version: 0.0.1
+Description: prov is a provisioning tool
