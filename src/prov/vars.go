@@ -29,3 +29,11 @@ func (me Vars) GetString(name string) (string, bool) {
 	result, ok := value.(string)
 	return result, ok
 }
+
+func (me Vars) Copy() Vars {
+	other := make(Vars, len(me))
+	for k, v := range me {
+		other[k] = v
+	}
+	return other
+}

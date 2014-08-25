@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -29,7 +28,7 @@ func RunTask(dir string, vars Vars, args Args, run bool) (Status, error) {
 	if !ok {
 		return OK, ErrTaskFailed{name, ErrInvalidArg("task")}
 	}
-	log.Printf("%s\n%s", name, strings.Repeat("=", len(name)))
+	log.Printf("-- %s\n", name)
 	task, ok := args.Task()
 	if !ok {
 		return OK, ErrTaskFailed{name, ErrInvalidArg("task")}
@@ -42,7 +41,7 @@ func RunTask(dir string, vars Vars, args Args, run bool) (Status, error) {
 	if err != nil {
 		return OK, ErrTaskFailed{name, err}
 	}
-	log.Printf("%s (%s)\n\n", status, time.Since(start).String())
+	log.Printf("%s (%s)\n", status, time.Since(start).String())
 	return status, nil
 }
 

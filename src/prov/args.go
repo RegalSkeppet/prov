@@ -86,3 +86,23 @@ func (me Args) StringList(name string) ([]string, bool) {
 	}
 	return result, true
 }
+
+func (me Args) Vars(name string) (Vars, bool) {
+	value1, ok := me[name]
+	if !ok {
+		return nil, false
+	}
+	value2, ok := value1.(map[interface{}]interface{})
+	if !ok {
+		return nil, false
+	}
+	result := make(Vars, len(value2))
+	for kI, v := range value2 {
+		k, ok := kI.(string)
+		if !ok {
+			return nil, false
+		}
+		result[k] = v
+	}
+	return result, true
+}

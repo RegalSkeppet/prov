@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
+	"strings"
 	"text/template"
 	"time"
 
@@ -20,9 +21,16 @@ func Include(dir string, vars Vars, args Args, run bool) (ok, changed int, err e
 		err = errors.New(`missing or invalid "path" argument`)
 		return
 	}
+	newVars, newVarsOK := args.Vars("vars")
+	if newVarsOK {
+		vars.SetVars(newVars)
+	}
 	filename := filepath.Join(dir, path)
-	log.Printf("==> %q.\n\n", filename)
+	log.Printf(">> %q.\n", filename)
 	tasks, handlers, err := readFile(filename, vars)
+	if err != nil {
+		return
+	}
 	queue := &TaskQueue{
 		Tasks: tasks,
 	}
@@ -57,7 +65,7 @@ func Include(dir string, vars Vars, args Args, run bool) (ok, changed int, err e
 	for task := queue.Next(); task != nil; task = queue.Next() {
 		if isInclude(task) {
 			var innerOK, innerChanged int
-			innerOK, innerChanged, err = Include(fileDir, vars, task, run)
+			innerOK, innerChanged, err = Include(fileDir, vars.Copy(), task, run)
 			if err != nil {
 				return
 			}
@@ -96,7 +104,7 @@ func Include(dir string, vars Vars, args Args, run bool) (ok, changed int, err e
 			}
 		}
 	}
-	log.Printf("<== %q (%s).\n\n", filename, time.Since(start).String())
+	log.Printf("<< %q (%s).\n", filename, time.Since(start).String())
 	return
 }
 
@@ -119,7 +127,7 @@ func readFile(filename string, vars Vars) (tasks []Args, handlers []Args, err er
 		Tasks    []Args
 		Handlers []Args
 	}
-	err = yaml.Unmarshal(buffer.Bytes(), &contents)
+	err = yaml.Unmarshal([]byte(strings.Replace(buffer.String(), "<no value>", "", -1)), &contents)
 	if err != nil {
 		return
 	}
