@@ -113,7 +113,7 @@ func readFile(filename string, vars Vars) (tasks []Args, handlers []Args, err er
 	if err != nil {
 		return
 	}
-	templ, err := template.New("template").Parse(string(fileRaw))
+	templ, err := template.New("template").Funcs(templateFuncs).Parse(string(fileRaw))
 	if err != nil {
 		return
 	}

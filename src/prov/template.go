@@ -13,6 +13,24 @@ func init() {
 	RegisterRunner("template", Template)
 }
 
+var templateFuncs = template.FuncMap{
+	"smap": func(value interface{}) (map[string]interface{}, error) {
+		valueMap, ok := value.(map[interface{}]interface{})
+		if !ok {
+			return nil, errors.New("value not a map")
+		}
+		result := make(map[string]interface{}, len(valueMap))
+		for k, v := range valueMap {
+			ks, ok := k.(string)
+			if !ok {
+				return nil, errors.New("key not a string")
+			}
+			result[ks] = v
+		}
+		return result, nil
+	},
+}
+
 func Template(dir string, vars Vars, args Args, run bool) (Status, error) {
 	templateFile, ok := args.String("template")
 	if !ok {
@@ -25,11 +43,16 @@ func Template(dir string, vars Vars, args Args, run bool) (Status, error) {
 	if !filepath.IsAbs(destination) {
 		return OK, errors.New(`argument "destination" needs to be absolute`)
 	}
+	extraVars, ok := args.Vars("vars")
+	if ok {
+		vars = vars.Copy()
+		vars.SetVars(extraVars)
+	}
 	contents, err := ioutil.ReadFile(filepath.Join(dir, templateFile))
 	if err != nil {
 		return OK, err
 	}
-	templ, err := template.New("template").Parse(string(contents))
+	templ, err := template.New("template").Funcs(templateFuncs).Parse(string(contents))
 	if err != nil {
 		return OK, err
 	}
