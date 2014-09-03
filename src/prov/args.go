@@ -5,7 +5,7 @@ import "fmt"
 type ErrInvalidArg string
 
 func (me ErrInvalidArg) Error() string {
-	return fmt.Sprintf("missing or invalid argument: %q", me)
+	return fmt.Sprintf("missing or invalid argument: %q", string(me))
 }
 
 type ErrCommandFailed struct {
