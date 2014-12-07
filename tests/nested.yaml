@@ -1,0 +1,7 @@
+---
+path: /tmp/from_nested.yaml
+...
+---
+- task: create file
+  path: {{ .path }}
+...

@@ -6,16 +6,14 @@ import (
 	"log"
 	"os"
 	"prov"
+	"strings"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
-var varsFlag prov.Vars = prov.Vars{}
-var runFlag = flag.Bool("run", false, "Actually perform changes.")
+var liveFlag = flag.Bool("live", false, "Actually perform changes.")
 var quietFlag = flag.Bool("quiet", false, "Only print summary information.")
-
-func init() {
-	flag.Var(&varsFlag, "vars", "YAML map to use as variables. Overrides existing variables.")
-}
 
 func main() {
 	log.SetFlags(0)
@@ -24,31 +22,45 @@ func main() {
 	if len(args) < 1 {
 		log.Fatal("missing file to work on")
 	}
-	err := Provision(args[0], varsFlag, *runFlag, *quietFlag)
+	vars, err := parseCommandlineVars(args[1:])
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	err = Provision(args[0], vars, *liveFlag, *quietFlag)
 	if err != nil {
 		os.Exit(1)
 	}
 }
 
-func Provision(filename string, vars prov.Vars, run, quiet bool) error {
+func parseCommandlineVars(args []string) (map[interface{}]interface{}, error) {
+	vars := map[interface{}]interface{}{}
+	for _, arg := range args {
+		split := strings.SplitN(arg, "=", 2)
+		var v interface{}
+		if len(split) > 1 {
+			err := yaml.Unmarshal([]byte(split[1]), &v)
+			if err != nil {
+				return nil, err
+			}
+		}
+		vars[split[0]] = v
+	}
+	return vars, nil
+}
+
+func Provision(filename string, vars map[interface{}]interface{}, live, quiet bool) error {
 	if quiet {
 		log.SetOutput(ioutil.Discard)
 	}
-	if *runFlag {
-		log.Println("*** Starting LIVE run ***")
-	} else {
-		log.Println("*** Starting test run ***")
-	}
-	log.Println()
 	start := time.Now()
-	ok, changed, err := prov.BootstrapFile(filename, vars, run)
+	ok, changed, err := prov.BootstrapFile(filename, vars, live)
 	if err != nil {
 		log.Println("*** FAILED ***")
 		log.SetOutput(os.Stderr)
 		log.Print(err.Error())
 		return err
 	}
-	if *runFlag {
+	if live {
 		log.Println("*** Finished LIVE run ***")
 	} else {
 		log.Println("*** Finished test run ***")

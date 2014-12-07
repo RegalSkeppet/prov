@@ -13,13 +13,13 @@ func init() {
 
 var aptGetInstallRE = regexp.MustCompile(`(?m)^(\d+) upgraded, (\d+) newly installed, (\d+) to remove and (\d+) not upgraded\.`)
 
-func AptGetInstall(dir string, vars Vars, args Args, run bool) (Status, error) {
-	pack, ok := args.String("package")
+func AptGetInstall(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	pack, ok := getStringVar(args, "package")
 	if !ok {
 		return OK, ErrInvalidArg("package")
 	}
 	params := []string{"--simulate", "--yes", "install", pack}
-	if run {
+	if live {
 		params = params[1:]
 	}
 	output, err := exec.Command("apt-get", params...).CombinedOutput()

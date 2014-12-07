@@ -6,13 +6,13 @@ func init() {
 	RegisterRunner("pacman", Pacman)
 }
 
-func Pacman(dir string, vars Vars, args Args, run bool) (Status, error) {
-	pack, ok := args.String("package")
+func Pacman(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	pack, ok := getStringVar(args, "package")
 	if !ok {
 		return OK, ErrInvalidArg("package")
 	}
 	err := exec.Command("pacman", "-Q", pack).Run()
-	update := args.Bool("update")
+	update, _ := getBoolVar(args, "update")
 	if update || err != nil {
 		output, err := exec.Command("pacman", "-Sy").CombinedOutput()
 		if err != nil {
@@ -29,7 +29,7 @@ func Pacman(dir string, vars Vars, args Args, run bool) (Status, error) {
 			return OK, nil
 		}
 	}
-	if run {
+	if live {
 		output, err := exec.Command("pacman", "--noconfirm", "-S", pack).CombinedOutput()
 		if err != nil {
 			return OK, ErrCommandFailed{err, output}

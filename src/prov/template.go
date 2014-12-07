@@ -31,22 +31,22 @@ var templateFuncs = template.FuncMap{
 	},
 }
 
-func Template(dir string, vars Vars, args Args, run bool) (Status, error) {
-	templateFile, ok := args.String("template")
+func Template(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	templateFile, ok := getStringVar(args, "template")
 	if !ok {
 		return OK, ErrInvalidArg("template")
 	}
-	destination, ok := args.String("destination")
+	destination, ok := getStringVar(args, "destination")
 	if !ok {
 		return OK, ErrInvalidArg("destination")
 	}
 	if !filepath.IsAbs(destination) {
 		return OK, errors.New(`argument "destination" needs to be absolute`)
 	}
-	extraVars, ok := args.Vars("vars")
+	extraVars, ok := getVarsVar(args, "vars")
 	if ok {
-		vars = vars.Copy()
-		vars.SetVars(extraVars)
+		vars = copyVars(vars)
+		setVars(vars, extraVars)
 	}
 	contents, err := ioutil.ReadFile(filepath.Join(dir, templateFile))
 	if err != nil {
@@ -73,7 +73,7 @@ func Template(dir string, vars Vars, args Args, run bool) (Status, error) {
 	status := OK
 	err = exec.Command("diff", filename, destination).Run()
 	if err != nil {
-		if run {
+		if live {
 			output, err := exec.Command("cp", filename, destination).CombinedOutput()
 			if err != nil {
 				return OK, ErrCommandFailed{err, output}
@@ -81,8 +81,8 @@ func Template(dir string, vars Vars, args Args, run bool) (Status, error) {
 		}
 		status = Changed
 	}
-	if run || status == OK {
-		changed, err := SetFileProperties(destination, args, run)
+	if live || status == OK {
+		changed, err := SetFileProperties(destination, args, live)
 		if err != nil {
 			return OK, err
 		}

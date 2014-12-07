@@ -7,85 +7,66 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 	"time"
 
-	"gopkg.in/yaml.v1"
+	"gopkg.in/yaml.v2"
 )
 
-func Include(dir string, vars Vars, args Args, run bool) (ok, changed int, err error) {
+func Include(dir string, vars, args map[interface{}]interface{}, live bool) (ok, changed int, err error) {
 	start := time.Now()
-	path, pathOK := args.String("path")
+	path, pathOK := getStringVar(args, "path")
 	if !pathOK {
-		err = errors.New(`missing or invalid "path" argument`)
+		err = ErrInvalidArg("path")
 		return
 	}
-	newVars, newVarsOK := args.Vars("vars")
+	vars = copyVars(vars)
+	newVars, newVarsOK := getVarsVar(args, "vars")
 	if newVarsOK {
-		vars.SetVars(newVars)
+		setVars(vars, newVars)
 	}
 	filename := filepath.Join(dir, path)
+	newDir := filepath.Dir(filename)
 	log.Printf(">> %q.\n", filename)
-	tasks, handlers, err := readFile(filename, vars)
+	tasks, err := readFile(filename, vars)
 	if err != nil {
 		return
 	}
-	queue := &TaskQueue{
-		Tasks: tasks,
-	}
-	handlersByName := map[string]Args{}
-	for _, handler := range handlers {
-		name, nameOK := handler.Name()
+	changedTasks := map[interface{}]struct{}{}
+	for _, task := range tasks {
+		name, nameOK := getStringVar(task, "name")
+		taskType, _ := getStringVar(task, "task")
 		if !nameOK {
-			err = errors.New(`handler missing or invalid "name" parameter`)
-			return
+			name = taskType
 		}
-		_, exists := handlersByName[name]
-		if exists {
-			err = fmt.Errorf("duplicate handler with name %q", name)
-			return
+		when, whenOK := task["when"]
+		if whenOK {
+			var check bool
+			check, err = checkWhen(when, changedTasks)
+			if err != nil {
+				return
+			}
+			if !check {
+				log.Printf("-- %v\nSKIPPED\n", name)
+				continue
+			}
 		}
-		handlersByName[name] = handler
-	}
-	activatedHandlers := map[string]struct{}{}
-	activateHandler := func(name string) error {
-		handler, handlerOK := handlersByName[name]
-		if !handlerOK {
-			return fmt.Errorf("unrecognized handler %q", name)
-		}
-		_, handlerOK = activatedHandlers[name]
-		if !handlerOK {
-			activatedHandlers[name] = struct{}{}
-			queue.Handlers = append(queue.Handlers, handler)
-		}
-		return nil
-	}
-	fileDir := filepath.Dir(filename)
-	for task := queue.Next(); task != nil; task = queue.Next() {
-		if isInclude(task) {
+		if taskType == "include" {
 			var innerOK, innerChanged int
-			innerOK, innerChanged, err = Include(fileDir, vars.Copy(), task, run)
+			innerOK, innerChanged, err = Include(newDir, vars, task, live)
 			if err != nil {
 				return
 			}
 			ok += innerOK
 			changed += innerChanged
-			if innerChanged > 0 {
-				handler, handlerOK := task.String("notify")
-				if handlerOK {
-					err = activateHandler(handler)
-					if err != nil {
-						return
-					}
-				}
+			if innerChanged > 0 && nameOK {
+				changedTasks[name] = struct{}{}
 			}
-		} else if isHandlers(task) {
-			queue.FlushHandlers = true
-			activatedHandlers = map[string]struct{}{}
 		} else {
 			var status Status
-			status, err = RunTask(fileDir, vars, task, run)
+			status, err = RunTask(newDir, name, vars, task, live)
 			if err != nil {
 				return
 			}
@@ -94,12 +75,8 @@ func Include(dir string, vars Vars, args Args, run bool) (ok, changed int, err e
 				ok++
 			case Changed:
 				changed++
-				handler, handlerOK := task.String("notify")
-				if handlerOK {
-					err = activateHandler(handler)
-					if err != nil {
-						return
-					}
+				if nameOK {
+					changedTasks[name] = struct{}{}
 				}
 			}
 		}
@@ -108,12 +85,24 @@ func Include(dir string, vars Vars, args Args, run bool) (ok, changed int, err e
 	return
 }
 
-func readFile(filename string, vars Vars) (tasks []Args, handlers []Args, err error) {
+var startMarkerRE = regexp.MustCompile(`(?m)^---$`)
+var endMarkerRE = regexp.MustCompile(`(?m)^\.\.\.$`)
+
+func readFile(filename string, vars map[interface{}]interface{}) (tasks []map[interface{}]interface{}, err error) {
 	fileRaw, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return
 	}
-	templ, err := template.New("template").Funcs(templateFuncs).Parse(string(fileRaw))
+	if len(startMarkerRE.FindAllIndex(fileRaw, -1)) > 1 {
+		var newVars map[interface{}]interface{}
+		err = yaml.Unmarshal([]byte(fileRaw), &newVars)
+		if err != nil {
+			return
+		}
+		setVars(vars, newVars)
+		fileRaw = []byte(endMarkerRE.Split(string(fileRaw), 2)[1])
+	}
+	templ, err := template.New("template").Parse(string(fileRaw))
 	if err != nil {
 		return
 	}
@@ -122,70 +111,48 @@ func readFile(filename string, vars Vars) (tasks []Args, handlers []Args, err er
 	if err != nil {
 		return
 	}
-	var contents struct {
-		Vars     Vars
-		Tasks    []Args
-		Handlers []Args
-	}
-	err = yaml.Unmarshal([]byte(strings.Replace(buffer.String(), "<no value>", "", -1)), &contents)
+	err = yaml.Unmarshal([]byte(strings.Replace(buffer.String(), "<no value>", "", -1)), &tasks)
 	if err != nil {
 		return
 	}
-	vars.SetVars(contents.Vars)
-	contents.Vars = nil
-	contents.Tasks = nil
-	contents.Handlers = nil
-	buffer.Reset()
-	err = templ.Execute(buffer, vars)
-	if err != nil {
-		return
-	}
-	err = yaml.Unmarshal(buffer.Bytes(), &contents)
-	if err != nil {
-		return
-	}
-	tasks = contents.Tasks
-	handlers = contents.Handlers
 	return
 }
 
-type TaskQueue struct {
-	Tasks         []Args
-	tasksIndex    int
-	Handlers      []Args
-	handlersIndex int
-	FlushHandlers bool
-}
-
-func (me *TaskQueue) Next() Args {
-	if me.FlushHandlers {
-		if me.handlersIndex < len(me.Handlers) {
-			task := me.Handlers[me.handlersIndex]
-			me.handlersIndex++
-			return task
-		} else {
-			me.FlushHandlers = false
+func checkWhen(when interface{}, changedTasks map[interface{}]struct{}) (bool, error) {
+	list, ok := when.([]interface{})
+	if !ok {
+		return false, errors.New("when is not an expected list")
+	}
+	result := false
+	for _, e := range list {
+		m, ok := e.(map[interface{}]interface{})
+		if !ok {
+			return false, errors.New("when item is not an expected map")
 		}
+		if len(m) != 1 {
+			return false, errors.New("when item is not an expected map with exactly one element")
+		}
+		var k, v interface{}
+		for k, v = range m {
+		}
+		nextResult, err := checkCond(k, v, changedTasks)
+		if err != nil {
+			return false, err
+		}
+		result = result || nextResult
 	}
-	if me.tasksIndex < len(me.Tasks) {
-		task := me.Tasks[me.tasksIndex]
-		me.tasksIndex++
-		return task
-	}
-	if me.handlersIndex < len(me.Handlers) {
-		task := me.Handlers[me.handlersIndex]
-		me.handlersIndex++
-		return task
-	}
-	return nil
+	return result, nil
 }
 
-func isInclude(args Args) bool {
-	task, _ := args.Task()
-	return task == "include"
-}
-
-func isHandlers(args Args) bool {
-	task, _ := args.Task()
-	return task == "handlers"
+func checkCond(check, value interface{}, changedTasks map[interface{}]struct{}) (bool, error) {
+	switch check {
+	case "ok":
+		_, ok := changedTasks[value]
+		return !ok, nil
+	case "changed":
+		_, ok := changedTasks[value]
+		return ok, nil
+	default:
+		return false, fmt.Errorf("unrecognized when check type: %v", check)
+	}
 }

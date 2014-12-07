@@ -9,12 +9,12 @@ func init() {
 	RegisterRunner("systemctl", Systemctl)
 }
 
-func Systemctl(dir string, vars Vars, args Args, run bool) (Status, error) {
-	service, ok := args.String("service")
+func Systemctl(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	service, ok := getStringVar(args, "service")
 	if !ok {
 		return OK, ErrInvalidArg("service")
 	}
-	state, ok := args.String("state")
+	state, ok := getStringVar(args, "state")
 	if !ok {
 		return OK, ErrInvalidArg("state")
 	}
@@ -24,7 +24,7 @@ func Systemctl(dir string, vars Vars, args Args, run bool) (Status, error) {
 		if err == nil {
 			return OK, nil
 		}
-		if run {
+		if live {
 			output, err := exec.Command("systemctl", "start", service).CombinedOutput()
 			if err != nil {
 				return OK, ErrCommandFailed{err, output}
@@ -32,7 +32,7 @@ func Systemctl(dir string, vars Vars, args Args, run bool) (Status, error) {
 		}
 		return Changed, nil
 	case "restarted":
-		if run {
+		if live {
 			output, err := exec.Command("systemctl", "restart", service).CombinedOutput()
 			if err != nil {
 				return OK, ErrCommandFailed{err, output}

@@ -10,8 +10,8 @@ func init() {
 	RegisterRunner("hostname", Hostname)
 }
 
-func Hostname(dir string, vars Vars, args Args, run bool) (Status, error) {
-	hostname, ok := args.String("hostname")
+func Hostname(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	hostname, ok := getStringVar(args, "hostname")
 	if !ok {
 		return OK, ErrInvalidArg("hostname")
 	}
@@ -22,7 +22,7 @@ func Hostname(dir string, vars Vars, args Args, run bool) (Status, error) {
 	if current == hostname {
 		return OK, nil
 	}
-	if run {
+	if live {
 		output, err := exec.Command("hostname", hostname).CombinedOutput()
 		if err != nil {
 			return OK, ErrCommandFailed{err, output}

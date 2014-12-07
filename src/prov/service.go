@@ -10,12 +10,12 @@ func init() {
 	RegisterRunner("service", Service)
 }
 
-func Service(dir string, vars Vars, args Args, run bool) (Status, error) {
-	service, ok := args.String("service")
+func Service(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	service, ok := getStringVar(args, "service")
 	if !ok {
 		return OK, ErrInvalidArg("service")
 	}
-	state, ok := args.String("state")
+	state, ok := getStringVar(args, "state")
 	if !ok {
 		return OK, ErrInvalidArg("state")
 	}
@@ -28,7 +28,7 @@ func Service(dir string, vars Vars, args Args, run bool) (Status, error) {
 		if strings.Contains(string(output), "start/running") {
 			return OK, nil
 		}
-		if run {
+		if live {
 			output, err := exec.Command("service", service, "start").CombinedOutput()
 			if err != nil {
 				return OK, ErrCommandFailed{err, output}
@@ -36,7 +36,7 @@ func Service(dir string, vars Vars, args Args, run bool) (Status, error) {
 		}
 		return Changed, nil
 	case "restarted":
-		if run {
+		if live {
 			output, err := exec.Command("service", service, "restart").CombinedOutput()
 			if err != nil {
 				return OK, ErrCommandFailed{err, output}

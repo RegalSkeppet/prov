@@ -17,8 +17,8 @@ func init() {
 
 var aptKeyGetFingerRE = regexp.MustCompile(`Key fingerprint = ([\d\w ]+)`)
 
-func AptKey(dir string, vars Vars, args Args, run bool) (Status, error) {
-	url, ok := args.String("url")
+func AptKey(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	url, ok := getStringVar(args, "url")
 	if !ok {
 		return OK, ErrInvalidArg("url")
 	}
@@ -74,7 +74,7 @@ func AptKey(dir string, vars Vars, args Args, run bool) (Status, error) {
 	if strings.Contains(string(output), matches[0][1]) {
 		return OK, nil
 	}
-	if run {
+	if live {
 		command := exec.Command("apt-key", "add", "-")
 		stdin, err = command.StdinPipe()
 		if err != nil {

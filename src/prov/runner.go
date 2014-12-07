@@ -14,7 +14,31 @@ const (
 	Changed = Status("CHANGED")
 )
 
-type TaskRunner func(dir string, vars Vars, args Args, run bool) (Status, error)
+type ErrInvalidArg string
+
+func (me ErrInvalidArg) Error() string {
+	return fmt.Sprintf("missing or invalid argument: %q", string(me))
+}
+
+type ErrCommandFailed struct {
+	Err    error
+	Output []byte
+}
+
+func (me ErrCommandFailed) Error() string {
+	return fmt.Sprintf("%s: %s", me.Err.Error(), me.Output)
+}
+
+type ErrTaskFailed struct {
+	Key interface{}
+	Err error
+}
+
+func (me ErrTaskFailed) Error() string {
+	return fmt.Sprintf("task %v failed: %s", me.Key, me.Err.Error())
+}
+
+type TaskRunner func(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error)
 
 var TaskRunners = map[string]TaskRunner{}
 
@@ -22,30 +46,26 @@ func RegisterRunner(name string, runner TaskRunner) {
 	TaskRunners[name] = runner
 }
 
-func RunTask(dir string, vars Vars, args Args, run bool) (Status, error) {
+func RunTask(dir string, key interface{}, vars, args map[interface{}]interface{}, live bool) (Status, error) {
 	start := time.Now()
-	name, ok := args.Name()
+	log.Printf("-- %v\n", key)
+	task, ok := getStringVar(args, "task")
 	if !ok {
-		return OK, ErrTaskFailed{name, ErrInvalidArg("task")}
-	}
-	log.Printf("-- %s\n", name)
-	task, ok := args.Task()
-	if !ok {
-		return OK, ErrTaskFailed{name, ErrInvalidArg("task")}
+		return OK, ErrTaskFailed{key, ErrInvalidArg("task")}
 	}
 	runner, ok := TaskRunners[task]
 	if !ok {
-		return OK, ErrTaskFailed{name, fmt.Errorf("unrecognized task: %q", task)}
+		return OK, ErrTaskFailed{key, fmt.Errorf("unrecognized task: %q", task)}
 	}
-	status, err := runner(dir, vars, args, run)
+	status, err := runner(dir, vars, args, live)
 	if err != nil {
-		return OK, ErrTaskFailed{name, err}
+		return OK, ErrTaskFailed{key, err}
 	}
 	log.Printf("%s (%s)\n", status, time.Since(start).String())
 	return status, nil
 }
 
-func BootstrapFile(filename string, vars Vars, run bool) (ok, changed int, err error) {
+func BootstrapFile(filename string, vars map[interface{}]interface{}, live bool) (ok, changed int, err error) {
 	absFilename, err := filepath.Abs(filename)
 	if err != nil {
 		return 0, 0, err
@@ -53,10 +73,10 @@ func BootstrapFile(filename string, vars Vars, run bool) (ok, changed int, err e
 	return Include(
 		filepath.Dir(absFilename),
 		vars,
-		Args{
+		map[interface{}]interface{}{
 			"task": "include",
 			"path": filepath.Base(filename),
 		},
-		run,
+		live,
 	)
 }

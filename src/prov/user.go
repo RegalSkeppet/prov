@@ -19,8 +19,8 @@ func init() {
 var uidRE = regexp.MustCompile(`(^|\s)uid=(\d+)`)
 var gidRE = regexp.MustCompile(`(^|\s)gid=(\d+)`)
 
-func User(dir string, vars Vars, args Args, run bool) (Status, error) {
-	username, ok := args.String("user")
+func User(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	username, ok := getStringVar(args, "user")
 	if !ok {
 		return OK, ErrInvalidArg("user")
 	}
@@ -33,7 +33,7 @@ func User(dir string, vars Vars, args Args, run bool) (Status, error) {
 		}
 		status = Changed
 	}
-	keys, ok := args.StringList("keys")
+	keys, ok := getStringListVar(args, "keys")
 	if ok {
 		userInfo, err := user.Lookup(username)
 		if err != nil {

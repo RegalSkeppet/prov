@@ -10,8 +10,8 @@ func init() {
 	RegisterRunner("create directory", CreateDir)
 }
 
-func CreateDir(dir string, vars Vars, args Args, run bool) (Status, error) {
-	path, ok := args.String("path")
+func CreateDir(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	path, ok := getStringVar(args, "path")
 	if !ok {
 		return OK, ErrInvalidArg("path")
 	}
@@ -23,7 +23,7 @@ func CreateDir(dir string, vars Vars, args Args, run bool) (Status, error) {
 	if err == nil {
 		file.Close()
 	} else {
-		if run {
+		if live {
 			err = os.Mkdir(path, 0755)
 			if err != nil {
 				return OK, err
@@ -31,8 +31,8 @@ func CreateDir(dir string, vars Vars, args Args, run bool) (Status, error) {
 		}
 		status = Changed
 	}
-	if run || status == OK {
-		changed, err := SetFileProperties(path, args, run)
+	if live || status == OK {
+		changed, err := SetFileProperties(path, args, live)
 		if err != nil {
 			return OK, err
 		}

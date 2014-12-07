@@ -1,28 +1,25 @@
 package prov
 
-import "gopkg.in/yaml.v1"
-
-type Vars map[string]interface{}
-
-func (vars *Vars) String() string {
-	return ""
-}
-
-func (vars *Vars) Set(raw string) error {
-	return yaml.Unmarshal([]byte(raw), vars)
-}
-
-func (me Vars) SetVars(vars Vars) {
-	for name, value := range vars {
-		_, ok := me[name]
-		if !ok {
-			me[name] = value
-		}
+func getBoolVar(vars map[interface{}]interface{}, name string) (bool, bool) {
+	value, ok := vars[name]
+	if !ok {
+		return false, false
 	}
+	result, ok := value.(bool)
+	return result, ok
 }
 
-func (me Vars) GetString(name string) (string, bool) {
-	value, ok := me[name]
+func getIntVar(vars map[interface{}]interface{}, name string) (int, bool) {
+	value, ok := vars[name]
+	if !ok {
+		return 0, false
+	}
+	result, ok := value.(int)
+	return result, ok
+}
+
+func getStringVar(vars map[interface{}]interface{}, name string) (string, bool) {
+	value, ok := vars[name]
 	if !ok {
 		return "", false
 	}
@@ -30,10 +27,51 @@ func (me Vars) GetString(name string) (string, bool) {
 	return result, ok
 }
 
-func (me Vars) Copy() Vars {
-	other := make(Vars, len(me))
-	for k, v := range me {
+func getStringListVar(vars map[interface{}]interface{}, name string) ([]string, bool) {
+	value1, ok := vars[name]
+	if !ok {
+		return nil, false
+	}
+	value2, ok := value1.([]interface{})
+	if !ok {
+		return nil, false
+	}
+	result := make([]string, len(value2))
+	for i, value3 := range value2 {
+		value4, ok := value3.(string)
+		if !ok {
+			return nil, false
+		}
+		result[i] = value4
+	}
+	return result, true
+}
+
+func getVarsVar(vars map[interface{}]interface{}, name string) (map[interface{}]interface{}, bool) {
+	value1, ok := vars[name]
+	if !ok {
+		return nil, false
+	}
+	value2, ok := value1.(map[interface{}]interface{})
+	if !ok {
+		return nil, false
+	}
+	return value2, true
+}
+
+func copyVars(vars map[interface{}]interface{}) map[interface{}]interface{} {
+	other := make(map[interface{}]interface{}, len(vars))
+	for k, v := range vars {
 		other[k] = v
 	}
 	return other
+}
+
+func setVars(upstream, downstream map[interface{}]interface{}) {
+	for k, v := range downstream {
+		_, ok := upstream[k]
+		if !ok {
+			upstream[k] = v
+		}
+	}
 }

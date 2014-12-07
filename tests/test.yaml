@@ -1,0 +1,25 @@
+---
+filepath1: /tmp/provtest1
+...
+---
+- name: create file 1
+  task: create file
+  path: {{ .filepath1 }}
+- name: create file 2
+  task: create file
+  path: /tmp/provtest2
+- name: create file 3
+  task: create file
+  path: /tmp/provtest3
+- name: create file 4
+  task: create file
+  path: /tmp/provtest4
+  when:
+    - changed: create file 1
+    - changed: create file 2
+    - changed: create file 3
+- task: include
+  path: nested.yaml
+  vars:
+    path: /tmp/from_test.yaml
+...

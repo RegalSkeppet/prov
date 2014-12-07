@@ -95,9 +95,9 @@ func SetFileGroup(filename, groupname string, run bool) (bool, error) {
 	return true, nil
 }
 
-func SetFileProperties(filename string, args Args, run bool) (bool, error) {
+func SetFileProperties(filename string, args map[interface{}]interface{}, run bool) (bool, error) {
 	var result bool
-	mode, ok := args.Int("mode")
+	mode, ok := getIntVar(args, "mode")
 	if ok {
 		changed, err := SetFileMode(filename, os.FileMode(mode), run)
 		if err != nil {
@@ -107,7 +107,7 @@ func SetFileProperties(filename string, args Args, run bool) (bool, error) {
 			result = true
 		}
 	}
-	owner, ok := args.String("owner")
+	owner, ok := getStringVar(args, "owner")
 	if ok {
 		changed, err := SetFileUser(filename, owner, run)
 		if err != nil {
@@ -117,7 +117,7 @@ func SetFileProperties(filename string, args Args, run bool) (bool, error) {
 			result = true
 		}
 	}
-	group, ok := args.String("group")
+	group, ok := getStringVar(args, "group")
 	if ok {
 		changed, err := SetFileGroup(filename, group, run)
 		if err != nil {

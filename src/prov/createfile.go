@@ -10,8 +10,8 @@ func init() {
 	RegisterRunner("create file", CreateFile)
 }
 
-func CreateFile(dir string, vars Vars, args Args, run bool) (Status, error) {
-	path, ok := args.String("path")
+func CreateFile(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+	path, ok := getStringVar(args, "path")
 	if !ok {
 		return OK, ErrInvalidArg("path")
 	}
@@ -23,7 +23,7 @@ func CreateFile(dir string, vars Vars, args Args, run bool) (Status, error) {
 	if err == nil {
 		file.Close()
 	} else {
-		if run {
+		if live {
 			file, err = os.Create(path)
 			if err != nil {
 				return OK, err
@@ -32,8 +32,8 @@ func CreateFile(dir string, vars Vars, args Args, run bool) (Status, error) {
 		}
 		status = Changed
 	}
-	if run || status == OK {
-		changed, err := SetFileProperties(path, args, run)
+	if live || status == OK {
+		changed, err := SetFileProperties(path, args, live)
 		if err != nil {
 			return OK, err
 		}
