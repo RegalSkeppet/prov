@@ -4,7 +4,7 @@ filepath1: /tmp/provtest1
 ---
 - name: create file 1
   task: create file
-  path: {{ .filepath1 }}
+  path: {{.filepath1}}
 - name: create file 2
   task: create file
   path: /tmp/provtest2
@@ -18,6 +18,12 @@ filepath1: /tmp/provtest1
     - changed: create file 1
     - changed: create file 2
     - changed: create file 3
+- task: include
+  path: nested.yaml
+  vars:
+    path: /tmp/from_test.yaml
+  when:
+    - changed: apa
 - task: include
   path: nested.yaml
   vars:

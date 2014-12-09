@@ -10,37 +10,37 @@ func init() {
 	RegisterRunner("copy file", CopyFile)
 }
 
-func CopyFile(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+func CopyFile(dir string, vars, args map[interface{}]interface{}, live bool) (changed bool, err error) {
 	dest, ok := getStringVar(args, "destination")
 	if !ok {
-		return OK, ErrInvalidArg("destination")
+		return false, ErrInvalidArg("destination")
 	}
 	if !filepath.IsAbs(dest) {
-		return OK, errors.New(`argument "destination" needs to be absolute`)
+		return false, errors.New(`argument "destination" needs to be absolute`)
 	}
 	src, ok := getStringVar(args, "source")
 	if !ok {
-		return OK, ErrInvalidArg("source")
+		return false, ErrInvalidArg("source")
 	}
 	src = filepath.Join(dir, src)
-	err := exec.Command("diff", src, dest).Run()
-	status := OK
+	err = exec.Command("diff", src, dest).Run()
+	status := false
 	if err != nil {
 		if live {
 			output, err := exec.Command("cp", src, dest).CombinedOutput()
 			if err != nil {
-				return OK, ErrCommandFailed{err, output}
+				return false, ErrCommandFailed{err, output}
 			}
 		}
-		status = Changed
+		status = true
 	}
-	if live || status == OK {
+	if live || status == false {
 		changed, err := SetFileProperties(dest, args, live)
 		if err != nil {
-			return OK, err
+			return false, err
 		}
 		if changed {
-			status = Changed
+			status = true
 		}
 	}
 	return status, nil

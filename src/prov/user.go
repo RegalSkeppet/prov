@@ -19,33 +19,32 @@ func init() {
 var uidRE = regexp.MustCompile(`(^|\s)uid=(\d+)`)
 var gidRE = regexp.MustCompile(`(^|\s)gid=(\d+)`)
 
-func User(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+func User(dir string, vars, args map[interface{}]interface{}, live bool) (changed bool, err error) {
 	username, ok := getStringVar(args, "user")
 	if !ok {
-		return OK, ErrInvalidArg("user")
+		return false, ErrInvalidArg("user")
 	}
-	status := OK
-	err := exec.Command("id", username).Run()
+	err = exec.Command("id", username).Run()
 	if err != nil {
 		output, err := exec.Command("useradd", "--create-home", username).CombinedOutput()
 		if err != nil {
-			return OK, ErrCommandFailed{err, output}
+			return false, ErrCommandFailed{err, output}
 		}
-		status = Changed
+		changed = true
 	}
 	keys, ok := getStringListVar(args, "keys")
 	if ok {
 		userInfo, err := user.Lookup(username)
 		if err != nil {
-			return OK, err
+			return false, err
 		}
 		uid, err := strconv.Atoi(userInfo.Uid)
 		if err != nil {
-			return OK, err
+			return false, err
 		}
 		gid, err := strconv.Atoi(userInfo.Gid)
 		if err != nil {
-			return OK, err
+			return false, err
 		}
 		sshDir := filepath.Join("/home", username, ".ssh")
 		authKeyFilename := filepath.Join(sshDir, "authorized_keys")
@@ -53,24 +52,24 @@ func User(dir string, vars, args map[interface{}]interface{}, live bool) (Status
 		if err != nil {
 			err = os.Mkdir(sshDir, 0700)
 			if err != nil {
-				return OK, err
+				return false, err
 			}
 			err = os.Chown(sshDir, uid, gid)
 			if err != nil {
-				return OK, err
+				return false, err
 			}
-			status = Changed
+			changed = true
 		}
 		_, err = os.Stat(authKeyFilename)
 		chown := err != nil
 		file, err := os.OpenFile(authKeyFilename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0600)
 		if err != nil {
-			return OK, err
+			return false, err
 		}
 		if chown {
 			err = file.Chown(uid, gid)
 			if err != nil {
-				return OK, err
+				return false, err
 			}
 		}
 		defer file.Close()
@@ -85,7 +84,7 @@ func User(dir string, vars, args map[interface{}]interface{}, live bool) (Status
 		}
 		err = scanner.Err()
 		if err != nil {
-			return OK, err
+			return false, err
 		}
 		dirty := false
 		if len(keys) != len(oldKeys) {
@@ -103,18 +102,18 @@ func User(dir string, vars, args map[interface{}]interface{}, live bool) (Status
 		if dirty {
 			err = file.Truncate(0)
 			if err != nil {
-				return OK, err
+				return false, err
 			}
 			_, err = file.Seek(0, 0)
 			if err != nil {
-				return OK, err
+				return false, err
 			}
 			_, err = file.Write([]byte(strings.Join(keys, "\n")))
 			if err != nil {
-				return OK, err
+				return false, err
 			}
-			status = Changed
+			changed = true
 		}
 	}
-	return status, nil
+	return changed, nil
 }

@@ -8,15 +8,15 @@ func init() {
 
 var aptGetUpdateHasRun = false
 
-func AptGetUpdate(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+func AptGetUpdate(dir string, vars, args map[interface{}]interface{}, live bool) (changed bool, err error) {
 	once, _ := getBoolVar(args, "once")
 	if once && aptGetUpdateHasRun {
-		return OK, nil
+		return false, nil
 	}
 	output, err := exec.Command("apt-get", "update").CombinedOutput()
 	if err != nil {
-		return OK, ErrCommandFailed{err, output}
+		return false, ErrCommandFailed{err, output}
 	}
 	aptGetUpdateHasRun = true
-	return OK, nil
+	return false, nil
 }

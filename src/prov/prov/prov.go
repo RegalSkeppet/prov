@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 	"log"
 	"os"
 	"prov"
@@ -13,7 +12,6 @@ import (
 )
 
 var liveFlag = flag.Bool("live", false, "Actually perform changes.")
-var quietFlag = flag.Bool("quiet", false, "Only print summary information.")
 
 func main() {
 	log.SetFlags(0)
@@ -26,7 +24,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	err = Provision(args[0], vars, *liveFlag, *quietFlag)
+	err = Provision(args[0], vars, *liveFlag)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -48,15 +46,11 @@ func parseCommandlineVars(args []string) (map[interface{}]interface{}, error) {
 	return vars, nil
 }
 
-func Provision(filename string, vars map[interface{}]interface{}, live, quiet bool) error {
-	if quiet {
-		log.SetOutput(ioutil.Discard)
-	}
+func Provision(filename string, vars map[interface{}]interface{}, live bool) error {
 	start := time.Now()
-	ok, changed, err := prov.BootstrapFile(filename, vars, live)
+	ok, changed, skipped, err := prov.RunFile(filename, vars, live)
 	if err != nil {
 		log.Println("*** FAILED ***")
-		log.SetOutput(os.Stderr)
 		log.Print(err.Error())
 		return err
 	}
@@ -65,9 +59,9 @@ func Provision(filename string, vars map[interface{}]interface{}, live, quiet bo
 	} else {
 		log.Println("*** Finished test run ***")
 	}
-	log.SetOutput(os.Stderr)
-	log.Printf("OK: %d", ok)
-	log.Printf("Changes: %d", changed)
-	log.Printf("Time: %s", time.Since(start).String())
+	log.Printf("time: %s\n", time.Since(start).String())
+	log.Printf("skipped: %d\n", skipped)
+	log.Printf("ok: %d\n", ok)
+	log.Printf("CHANGED: %d\n", changed)
 	return nil
 }

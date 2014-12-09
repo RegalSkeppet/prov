@@ -10,28 +10,28 @@ func init() {
 	RegisterRunner("script", Script)
 }
 
-func Script(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+func Script(dir string, vars, args map[interface{}]interface{}, live bool) (changed bool, err error) {
 	ifArg, ok := getStringVar(args, "if")
 	if ok {
 		err := exec.Command("bash", "-c", ifArg).Run()
 		if err != nil {
-			return OK, nil
+			return false, nil
 		}
 	}
 	unless, ok := getStringVar(args, "unless")
 	if ok {
 		err := exec.Command("bash", "-c", unless).Run()
 		if err == nil {
-			return OK, nil
+			return false, nil
 		}
 	}
 	script, scriptOK := getStringVar(args, "script")
 	file, fileOK := getStringVar(args, "file")
 	if !scriptOK && !fileOK {
-		return OK, errors.New(`need atleast one valid "script" or "file" argument`)
+		return false, errors.New(`need atleast one valid "script" or "file" argument`)
 	}
 	if scriptOK && fileOK {
-		return OK, errors.New(`cannot use both "script" and "file" argument`)
+		return false, errors.New(`cannot use both "script" and "file" argument`)
 	}
 	if live {
 		var output []byte
@@ -41,12 +41,12 @@ func Script(dir string, vars, args map[interface{}]interface{}, live bool) (Stat
 		} else if fileOK {
 			output, err = exec.Command("bash", file).CombinedOutput()
 		} else {
-			return OK, errors.New("neither script nor file was run")
+			return false, errors.New("neither script nor file was run")
 		}
 		log.Print(string(output))
 		if err != nil {
-			return OK, err
+			return false, err
 		}
 	}
-	return Changed, nil
+	return true, nil
 }

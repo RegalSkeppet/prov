@@ -5,17 +5,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"prov"
 	"strings"
 	"testing"
 )
 
 const templateFileYAML = `
-tasks:
-  - task: template
-    template: temp
-    destination: DEST
-    mode: 0664
+- task: template
+  template: temp
+  destination: DEST
+  mode: 0664
 `
 
 const templateFileSource = "{{ .content }}"
@@ -37,7 +35,7 @@ func TestTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = Provision(yamlFilename, prov.Vars{"content": "test"}, true, false)
+	err = Provision(yamlFilename, map[interface{}]interface{}{"content": "test"}, true)
 	if err != nil {
 		t.Fatal(err)
 	}

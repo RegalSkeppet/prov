@@ -5,17 +5,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"prov"
 	"strings"
 	"testing"
 )
 
 const copyFileYAML = `
-tasks:
-  - task: copy file
-    source: src
-    destination: DEST
-    mode: 0664
+- task: copy file
+  source: src
+  destination: DEST
+  mode: 0664
 `
 
 const copyFileSource = "content"
@@ -37,7 +35,7 @@ func TestCopyFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = Provision(yamlFilename, make(prov.Vars), true, false)
+	err = Provision(yamlFilename, nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}

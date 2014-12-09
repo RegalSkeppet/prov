@@ -31,17 +31,17 @@ var templateFuncs = template.FuncMap{
 	},
 }
 
-func Template(dir string, vars, args map[interface{}]interface{}, live bool) (Status, error) {
+func Template(dir string, vars, args map[interface{}]interface{}, live bool) (changed bool, err error) {
 	templateFile, ok := getStringVar(args, "template")
 	if !ok {
-		return OK, ErrInvalidArg("template")
+		return false, ErrInvalidArg("template")
 	}
 	destination, ok := getStringVar(args, "destination")
 	if !ok {
-		return OK, ErrInvalidArg("destination")
+		return false, ErrInvalidArg("destination")
 	}
 	if !filepath.IsAbs(destination) {
-		return OK, errors.New(`argument "destination" needs to be absolute`)
+		return false, errors.New(`argument "destination" needs to be absolute`)
 	}
 	extraVars, ok := getVarsVar(args, "vars")
 	if ok {
@@ -50,45 +50,41 @@ func Template(dir string, vars, args map[interface{}]interface{}, live bool) (St
 	}
 	contents, err := ioutil.ReadFile(filepath.Join(dir, templateFile))
 	if err != nil {
-		return OK, err
+		return false, err
 	}
 	templ, err := template.New("template").Funcs(templateFuncs).Parse(string(contents))
 	if err != nil {
-		return OK, err
+		return false, err
 	}
 	file, err := ioutil.TempFile("", "")
 	if err != nil {
-		return OK, err
+		return false, err
 	}
 	filename := file.Name()
 	defer os.RemoveAll(filename)
 	err = templ.Execute(file, vars)
 	if err != nil {
-		return OK, err
+		return false, err
 	}
 	err = file.Close()
 	if err != nil {
-		return OK, err
+		return false, err
 	}
-	status := OK
 	err = exec.Command("diff", filename, destination).Run()
 	if err != nil {
 		if live {
 			output, err := exec.Command("cp", filename, destination).CombinedOutput()
 			if err != nil {
-				return OK, ErrCommandFailed{err, output}
+				return false, ErrCommandFailed{err, output}
 			}
 		}
-		status = Changed
+		changed = true
 	}
-	if live || status == OK {
-		changed, err := SetFileProperties(destination, args, live)
+	if live || !changed {
+		changed, err = SetFileProperties(destination, args, live)
 		if err != nil {
-			return OK, err
-		}
-		if changed {
-			status = Changed
+			return false, err
 		}
 	}
-	return status, nil
+	return changed, nil
 }
