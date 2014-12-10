@@ -115,7 +115,7 @@ func RunFile(filename string, vars map[interface{}]interface{}, live bool) (ok, 
 		default:
 			runner, runnerOK := taskRunners[taskType]
 			if !runnerOK {
-				err = ErrTaskFailed{name, fmt.Errorf("unrecognized task: %q", task)}
+				err = ErrTaskFailed{name, fmt.Errorf("unrecognized task: %q", taskType)}
 				return
 			}
 			taskChanged := false
